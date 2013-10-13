@@ -14,7 +14,7 @@ add-toc-to-pdf
 
 ruby add-toc-to-pdf.rb 目次ファイル オリジナルのPDFファイル 生成される目次を付与したPDFファイル
 
-[prawn]: http://prawn.majesticseacreature.com を使用していますのでインストールしてください。
+[prawn](http://prawn.majesticseacreature.com "prawn") を使用していますのでインストールしてください。
 
 目次ファイルは以下のように見出しとページ番号をタブ(\t)で区切った形式になります。
 ページ番号は、通しノンブルには数値を、別ノンブルは数値を丸括弧で囲んで記載します。
