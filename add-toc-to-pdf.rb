@@ -15,7 +15,7 @@ def get_command_line_info
 
   opt = OptionParser.new
   opt.banner =<<"BANNER"
-#{File.basename($0)} - tocファイルに記載されたページ番号(通しノンブルと別ノンブル)をPDFファイルの物理番号に変換する。
+#{File.basename($0)} - tocファイルに記載されたページ番号(通しノンブルと別ノンブル)を目次としてPDFファイルに設定します。
 
 Usage: #{File.basename($0)} [options] toc_file original_pdf_file [pdf_file_with_toc]
 
