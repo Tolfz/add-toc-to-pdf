@@ -16,3 +16,9 @@ tmp
 .yardoc
 _yardoc
 doc/
+
+# mac
+.DS_Store
+
+# emacs
+*~

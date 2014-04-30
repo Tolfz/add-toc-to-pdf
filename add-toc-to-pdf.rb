@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
+require 'rubygems'
 require 'pp'
 require 'prawn'
+require 'prawn/templates'
 require 'fileutils'
 
 DEFAULT_BETSU_NOMBLE_START_NO = 1
