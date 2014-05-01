@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-require 'rubygems'
+require 'fileutils'
+require 'optparse'
 require 'pp'
 require 'prawn'
 require 'prawn/templates'
-require 'fileutils'
+require 'yaml'
 
 DEFAULT_BETSU_NOMBLE_START_NO = 1
 DEFAULT_TOOSHI_NOMBLE_START_NO = 10
@@ -12,22 +13,36 @@ DEFAULT_TOOSHI_NOMBLE_START_NO = 10
 def get_command_line_info
   toc_meta = {
     :betsu_nombre_start_no =>  DEFAULT_BETSU_NOMBLE_START_NO,
-    :tooshi_nombre_start_no => DEFAULT_TOOSHI_NOMBLE_START_NO
+    :tooshi_nombre_start_no => DEFAULT_TOOSHI_NOMBLE_START_NO,
+    :toc_file => nil,
+    :src_pdf => nil,
+    :dst_pdf => nil
   }
+
+  is_dump_config = false
 
   opt = OptionParser.new
   opt.banner =<<"BANNER"
 #{File.basename($0)} - tocファイルに記載されたページ番号(通しノンブルと別ノンブル)を目次としてPDFファイルに設定します。
 
-Usage: #{File.basename($0)} [options] toc_file original_pdf_file [pdf_file_with_toc]
-
-   1番目の引数に目次ファイルのパス、
-   2番目の引数に目次を付与したいPDFファイル、
-   3番目の引数(オプション)に生成される目次が付与されたPDFファイルを指定する。
-   3番目の引数が省略された場合は、2番目の引数のPDFファイル名の先頭に"toc_"を付与したPDFファイルを生成する。
-
+Usage: #{File.basename($0)} [options]
 BANNER
-
+ # 目次ファイル
+  opt.on("-m",
+         "--toc-file toc_file",
+         String,
+         "目次ファイルを指定する。"
+         ){|f|
+    toc_meta[:toc_file] = f
+  }
+  # ソースPDF
+  opt.on("-s",
+         "--src-pdf src_pdf",
+         String,
+         "元PDFファイルを指定する。"
+         ){|f|
+    toc_meta[:src_pdf] = f
+  }
   # 別ノンブルの開始物理ページ番号
   opt.on("-b",
          "--betsu-start-no pageNo",
@@ -44,42 +59,90 @@ BANNER
          ){|n|
     toc_meta[:tooshi_nombre_start_no] = n
   }
+  # 変換結果PDF
+  opt.on("-d",
+         "--dst-pdf dst_pdf",
+         String,
+         "変換結果PDFファイルを指定する。(デフォルト値:toc_(ソースPDF名))"
+         ){|f|
+    toc_meta[:dst_pdf] = f
+  }
+  # 設定ファイル
+  opt.on("-c",
+         "--config config",
+         String,
+         "設定ファイルを指定する。"
+         ){|f|
+    toc_meta[:config] = f
+  }
+  # 設定ファイル
+  opt.on("--dump-config",
+         "現在指定されたオプションに該当する設定ファイルを出力する。"
+         ){|b|
+    is_dump_config = b
+  }
 
   opt.parse!(ARGV)
 
-  if ARGV.size == 0
+
+  # 設定ファイルチェック
+  if toc_meta[:config]
+    # 設定ファイル読み込み
+    config_path = File.expand_path(toc_meta[:config])
+
+    unless File.exists?(config_path)
+      puts "エラー:設定ファイル(#{toc_meta[:config]})が存在しません。"
+      puts ""
+      puts opt.help
+      exit -1
+    end
+    config = YAML.load_file(config_path)
+
+    # 設定ファイルの値をtoc_metaに設定
+    toc_meta.keys.each do |sym|
+      if config.key?(sym)
+        toc_meta[sym] = config[sym]
+      end
+    end
+  end
+
+
+  unless toc_meta[:toc_file]
     puts "エラー: 目次ファイルのパスを指定してください。"
     puts ""
     puts opt.help
     exit -1
   end
 
-  if ARGV.size == 1
+  unless toc_meta[:src_pdf]
     puts "エラー: PDFファイルのパスを指定してください。"
     puts ""
     puts opt.help
     exit -1
   end
 
-  if ARGV.size < 2
-    puts "エラー: 目次ファイルとPDFファイルのパスを指定してください。"
+  unless File.exists?(File.expand_path(toc_meta[:toc_file]))
+    puts "エラー: 目次ファイル(#{toc_meta[:toc_file]})が見つかりません。"
     puts ""
     puts opt.help
     exit -1
   end
 
-  unless File.exists?(File.expand_path(ARGV[0]))
-    puts "エラー: 目次ファイル(#{ARGV[0]})が見つかりません。"
+  unless File.exists?(File.expand_path(toc_meta[:src_pdf]))
+    puts "エラー: PDFファイル(#{toc_meta[:src_pdf]})が見つかりません。"
     puts ""
     puts opt.help
     exit -1
   end
 
-  unless File.exists?(File.expand_path(ARGV[1]))
-    puts "エラー: PDFファイル(#{ARGV[1]})が見つかりません。"
-    puts ""
-    puts opt.help
-    exit -1
+  unless toc_meta[:dst_pdf]
+    toc_meta[:dst_pdf] = gen_new_pdf_path(toc_meta[:src_pdf])
+  end
+
+  if is_dump_config
+    toc_meta.delete(:config)
+    puts YAML.dump(toc_meta)
+    exit 0
   end
 
   return toc_meta
@@ -114,7 +177,7 @@ def show_toc_with_pdf_no(toc_info)
 end
 
 def setup_pdf_toc(toc_info, org_pdf_path, new_pdf_path)
-  puts new_pdf_path
+  #puts new_pdf_path
   dir_path = File.dirname(new_pdf_path)
   unless File.exists?(dir_path)
     FileUtils.mkdir_p(dir_path)
@@ -144,23 +207,19 @@ end
 # tocファイルに記載されたページ番号(通しノンブルと別ノンブル)をPDFファイルの目次に設定する。
 if __FILE__ == $PROGRAM_NAME
 
-  require 'optparse'
-
   # コマンドラインを解析する
   meta = get_command_line_info
 
 
-  toc_path = ARGV.shift
-  org_pdf_path = ARGV.shift
-  new_pdf_path = ARGV.shift
-  unless new_pdf_path
-      new_pdf_path = gen_new_pdf_path(org_pdf_path)
-  end
+  toc_path = meta[:toc_file]
+  org_pdf_path = meta[:src_pdf]
+  new_pdf_path = meta[:dst_pdf]
 
   toc_info = {
     :betsu_no => [],
     :tooshi_no => []
   }
+
   # tocファイルを読み込む
   File.open(File.expand_path(toc_path)) do |f|
     f.each do |line|
